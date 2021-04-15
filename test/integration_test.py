@@ -1,19 +1,19 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from atm import AtmController
+from atm import Atm
 
 
 class IntegrationTest(TestCase):
-    atm_ctrl = None
+    atm = None
 
     @classmethod
     def setUpClass(cls):
-        cls.atm_ctrl = AtmController()
+        cls.atm = Atm()
 
     def test0_insert_card(self):
         card = MagicMock()
-        IntegrationTest.atm_ctrl.insert_card(card)
+        IntegrationTest.atm.insert_card(card)
 
     def test1_enter_pin(self):
         IntegrationTest.atm.enter_pin(12)
