@@ -16,6 +16,14 @@ class Atm:
         """
         self.context.current.insert_card(card)
 
+    def enter_pin(self, pin):
+        """enter pin using `AtmReady`
+
+        Args:
+            pin (str): personal identification number
+        """
+        self.context.current.enter_pin(pin)
+
 
 class AtmContext:
     def __init__(self):
@@ -69,6 +77,18 @@ class AtmState:
         """
         raise RuntimeError('restricted behaviour')
 
+    def enter_pin(self, pin):
+        """enter pin number in `AtmReady`
+
+        Args:
+            pin (str): personal identification number
+
+        Raises:
+            ValueError: incorrect pin is entered - when it raised,
+              then it does not be changed to `AtmExit`
+        """
+        raise RuntimeError('restricted behavior')
+
 
 class AtmWait(AtmState):
     """The state waiting for a card (waiting for customers)
@@ -99,7 +119,28 @@ class AtmReady(AtmState):
 
     - when a back is selected, then it's changed to `AtmExit`
     """
-    pass
+
+    def enter_pin(self, pin):
+        """enter pin number in `AtmReady`
+
+        Args:
+            pin (str): personal identification number
+
+        Raises:
+            ValueError: incorrect pin is entered - when it raised,
+              then it does not be changed to `AtmExit`
+        """
+        print('enter pin', pin)
+        # TODO: verify number from server
+        try:
+            if pin == '1':
+                self.shared_context.set_state(AtmAuthorized.get_name())
+                return True
+            else:
+                raise ValueError('pin is not matched')
+        except ValueError as e:
+            self.shared_context.set_state(AtmExit.get_name())
+            print(e)
 
 
 class AtmAuthorized(AtmState):
