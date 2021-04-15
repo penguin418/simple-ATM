@@ -1,12 +1,19 @@
 from typing import TYPE_CHECKING
 
+from model.command import MockValidatePinCommand
+
 if TYPE_CHECKING:
     from model.domain import Card
+    from model.command import IValidatePinCommand
 
 
 class Atm:
-    def __init__(self):
+    def __init__(self, validate_pin_command=None):
         self.context = AtmContext()
+        if validate_pin_command:
+            self.context.validate_pin_command = validate_pin_command
+        else:
+            self.context.validate_pin_command = MockValidatePinCommand()
 
     def insert_card(self, card):
         """insert card using `AtmWait`
@@ -36,8 +43,9 @@ class AtmContext:
             AtmProcessingWithdrawal.get_name(): AtmProcessingWithdrawal(self),
             AtmExit.get_name(): AtmExit(self),
         }
-        self.current = self.states[AtmWait.get_name()]
-        self.card = None
+        self.current = self.states[AtmWait.get_name()]  # type: AtmState
+        self.card = None  # type: Card
+        self.validate_pin_command = None  # type: IValidatePinCommand
 
     def set_state(self, state_name):
         """set current state by state name
@@ -133,7 +141,10 @@ class AtmReady(AtmState):
         print('enter pin', pin)
         # TODO: verify number from server
         try:
-            if pin == '1':
+            if self.shared_context.validate_pin_command.execute(
+                    self.shared_context.card.card_number,
+                    pin
+            ):
                 self.shared_context.set_state(AtmAuthorized.get_name())
                 return True
             else:
