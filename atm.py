@@ -1,8 +1,20 @@
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from model.domain import Card
+
+
 class Atm:
     def __init__(self):
         self.context = AtmContext()
 
-    pass
+    def insert_card(self, card):
+        """insert card using `AtmWait`
+
+        Args:
+            card (Card): current card
+        """
+        self.context.current.insert_card(card)
 
 
 class AtmContext:
@@ -17,12 +29,13 @@ class AtmContext:
             AtmExit.get_name(): AtmExit(self),
         }
         self.current = self.states[AtmWait.get_name()]
+        self.card = None
 
     def set_state(self, state_name):
         """set current state by state name
 
         Args:
-            state_name(str): name of next state
+            state_name (str): name of next state
         """
         self.current = self.states[state_name]
 
@@ -36,7 +49,7 @@ class AtmState:
     def __init__(self, context):
         """
         Args:
-            context(AtmContext): shared context
+            context (AtmContext): shared context
         """
         self.shared_context = context
 
@@ -48,6 +61,14 @@ class AtmState:
         """
         return cls.__name__
 
+    def insert_card(self, card):
+        """insert card in `AtmWait`
+
+        Args:
+            card (Card): current card
+        """
+        raise RuntimeError('restricted behaviour')
+
 
 class AtmWait(AtmState):
     """The state waiting for a card (waiting for customers)
@@ -56,7 +77,17 @@ class AtmWait(AtmState):
 
     - when a card is inserted th,en it's changed to the `AtmReady`
     """
-    pass
+
+    def insert_card(self, card):
+        """insert card in `AtmWait`
+
+        - when success, then it's changed to `AtmReady`
+        Args:
+            card (Card): current card
+        """
+        print('insert card', card)
+        self.shared_context.card = card
+        self.shared_context.set_state(AtmReady.get_name())
 
 
 class AtmReady(AtmState):
