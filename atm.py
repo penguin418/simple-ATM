@@ -35,6 +35,14 @@ class Atm:
         """retrieve accounts connected to card"""
         self.context.current.get_accounts()
 
+    def select_account(self, idx):
+        """select account
+
+        Args:
+            idx (int): index of accounts in shared_context, start with 0
+        """
+        self.context.current.select_account(idx)
+
 
 class AtmContext:
     def __init__(self):
@@ -50,6 +58,7 @@ class AtmContext:
         self.current = self.states[AtmWait.get_name()]  # type: AtmState
         self.card = None  # type: Card
         self.accounts = []
+        self.selected_account = None  # type: Account
         self.bank_system = None  # type: IBankSystem
 
     def set_state(self, state_name):
@@ -107,6 +116,18 @@ class AtmState:
         raise RuntimeError('restricted behavior')
 
     def get_accounts(self):
+        raise RuntimeError('restricted behavior')
+
+    def select_account(self, idx):
+        """select account to be used in `AtmAuthorized`
+
+        - when is success, then it's changed to `AtmAccountSelected`
+
+        Args:
+            idx (int): index of accounts in shared_context, start with 0
+        Raises:
+            IndexError: idx is not in range of account list - when it's raised, then it's changed to `AtmExit`
+        """
         raise RuntimeError('restricted behavior')
 
 
@@ -198,6 +219,24 @@ class AtmAuthorized(AtmState):
             print(e)
             self.shared_context.set_state(AtmExit.get_name())
         return self.shared_context.accounts
+
+    def select_account(self, idx):
+        """select account to be used in `AtmAuthorized`
+
+        - when is success, then it's changed to `AtmAccountSelected`
+
+        Args:
+            idx (int): index of accounts in shared_context, start with 0
+        Raises:
+            IndexError: idx is not in range of account list - when it's raised, then it's changed to `AtmExit`
+        """
+        try:
+            self.shared_context.selected_account \
+                = self.shared_context.accounts[idx]
+            self.shared_context.set_state(AtmAccountSelected.get_name())
+        except IndexError as e:
+            print(e)
+            print('please choose again, index starts from 0, candidates=', self.shared_context.accounts)
 
 
 class AtmAccountSelected(AtmState):

@@ -48,7 +48,7 @@ class IntegrationTest(TestCase):
 
     def test3_select_one_of_account(self):
         # when
-        IntegrationTest.atm.select_account(1)
+        IntegrationTest.atm.select_account(0)
 
         # then
         self.assertEqual(
