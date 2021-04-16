@@ -1,19 +1,19 @@
 from typing import TYPE_CHECKING
 
-from model.command import MockValidatePinCommand
+from infra.bank_api import MockBankSystem1, IBankSystem
 
 if TYPE_CHECKING:
-    from model.domain import Card
-    from model.command import IValidatePinCommand
+    from model.domain import Card, Account
 
 
 class Atm:
-    def __init__(self, validate_pin_command=None):
-        self.context = AtmContext()
-        if validate_pin_command:
-            self.context.validate_pin_command = validate_pin_command
-        else:
-            self.context.validate_pin_command = MockValidatePinCommand()
+    def __init__(self, bank_system=None):
+        """
+        Args:
+            bank_system:
+        """
+        self.context = AtmContext()  # type: AtmContext
+        self.context.bank_system = bank_system() if bank_system else MockBankSystem1()
 
     def insert_card(self, card):
         """insert card using `AtmWait`
@@ -45,7 +45,7 @@ class AtmContext:
         }
         self.current = self.states[AtmWait.get_name()]  # type: AtmState
         self.card = None  # type: Card
-        self.validate_pin_command = None  # type: IValidatePinCommand
+        self.bank_system = None  # type: IBankSystem
 
     def set_state(self, state_name):
         """set current state by state name
@@ -141,7 +141,7 @@ class AtmReady(AtmState):
         print('enter pin', pin)
         # TODO: verify number from server
         try:
-            if self.shared_context.validate_pin_command.execute(
+            if self.shared_context.bank_system.validate_pin(
                     self.shared_context.card.card_number,
                     pin
             ):
