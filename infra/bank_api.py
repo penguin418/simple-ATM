@@ -17,6 +17,11 @@ class IBankSystem(metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
+    def get_accounts(self, card):
+        """retrieve all accounts connected to card"""
+        pass
+
 
 def mock_server_api(x, y):
     return y == '1'
@@ -37,3 +42,17 @@ class MockBankSystem1(IBankSystem):
         """
         # using bank system
         return self.__get_account_pin_api(card_number, pin)
+
+    def get_accounts(self, card):
+        """retrieve all accounts connected to card
+
+        - since this is mock class, it skip retrieving accounts
+
+        - instead it return account from card
+
+        - i assumed that it would retrieve accounts using join query
+
+        Args:
+            card (Card): card
+        """
+        return card.card_holder.accounts

@@ -14,6 +14,8 @@ class IntegrationTest(TestCase):
     def test0_insert_card(self):
         # given
         card = MagicMock()
+        card.card_holder = MagicMock()
+        card.card_holder.accounts = [MagicMock()]
 
         # when
         IntegrationTest.atm.insert_card(card)

@@ -31,6 +31,10 @@ class Atm:
         """
         self.context.current.enter_pin(pin)
 
+    def get_accounts(self):
+        """retrieve accounts connected to card"""
+        self.context.current.get_accounts()
+
 
 class AtmContext:
     def __init__(self):
@@ -45,6 +49,7 @@ class AtmContext:
         }
         self.current = self.states[AtmWait.get_name()]  # type: AtmState
         self.card = None  # type: Card
+        self.accounts = []
         self.bank_system = None  # type: IBankSystem
 
     def set_state(self, state_name):
@@ -54,6 +59,7 @@ class AtmContext:
             state_name (str): name of next state
         """
         self.current = self.states[state_name]
+        self.current.on_load()
 
 
 class AtmState:
@@ -77,6 +83,9 @@ class AtmState:
         """
         return cls.__name__
 
+    def on_load(self):
+        pass
+
     def insert_card(self, card):
         """insert card in `AtmWait`
 
@@ -95,6 +104,9 @@ class AtmState:
             ValueError: incorrect pin is entered - when it raised,
               then it does not be changed to `AtmExit`
         """
+        raise RuntimeError('restricted behavior')
+
+    def get_accounts(self):
         raise RuntimeError('restricted behavior')
 
 
@@ -164,7 +176,28 @@ class AtmAuthorized(AtmState):
     - when a back-menu is selected, then it's changed to `AtmReady`
     """
 
-    pass
+    def on_load(self):
+        self.get_accounts()
+
+    def get_accounts(self):
+        """get account list which is connected to card in `AtmAuthorized`
+
+        Raises:
+            ReferenceError: cannot find accounts - when it's raised, then it's changed to `AtmExit`
+
+        Returns:
+            list[Account]: list of account
+        """
+        try:
+            self.shared_context.accounts \
+                = self.shared_context.bank_system.get_accounts(self.shared_context.card)
+            if len(self.shared_context.accounts) < 1:
+                raise RuntimeError('cannot find accounts')
+            print('get accounts result=', self.shared_context.accounts)
+        except RuntimeError as e:
+            print(e)
+            self.shared_context.set_state(AtmExit.get_name())
+        return self.shared_context.accounts
 
 
 class AtmAccountSelected(AtmState):
