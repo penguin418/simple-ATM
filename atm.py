@@ -80,6 +80,10 @@ class Atm:
         """
         self.context.current.take_cash(amount)
 
+    def select_balance(self):
+        """select balance"""
+        self.context.current.select_balance()
+
 class AtmContext:
     def __init__(self):
         self.states = {
@@ -211,6 +215,13 @@ class AtmState:
 
         Args:
             amount (int): amount of money to withdraw
+        """
+        raise RuntimeError('restricted behavior')
+
+    def select_balance(self):
+        """select display balance menu in `AtmAccountSelected`
+
+        * it's changed to `AtmDisplayingBalance`
         """
         raise RuntimeError('restricted behavior')
 
@@ -352,6 +363,12 @@ class AtmAccountSelected(AtmState):
         """
         self.shared_context.set_state(AtmPreProcessingWithdrawal.get_name())
 
+    def select_balance(self):
+        """select display balance menu in `AtmAccountSelected`
+
+        * it's changed to `AtmDisplayingBalance`
+        """
+        self.shared_context.set_state(AtmDisplayingBalance.get_name())
 
 class AtmProcessingDeposit(AtmState):
     """The state processing deposit transaction
@@ -446,6 +463,9 @@ class AtmDisplayingBalance(AtmState):
 
     - cannot go back to former state
     """
+
+    def on_load(self):
+        print(self.shared_context.selected_account)
 
     def back_to_accounts(self):
         self.shared_context.set_state(AtmAuthorized.get_name())
