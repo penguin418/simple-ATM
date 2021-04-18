@@ -1,10 +1,10 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from atm import Atm, AtmExit, AtmAuthorized, AtmAccountSelected
+from atm import Atm, AtmAuthorized, AtmAccountSelected
 
 
-class AtmReadyTest(TestCase):
+class Unittest(TestCase):
     def setUp(self):
         # given
         self.atm = Atm()
