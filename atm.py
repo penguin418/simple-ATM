@@ -51,6 +51,11 @@ class Atm:
         """
         self.context.current.select_deposit()
 
+    def select_withdraw(self):
+        """select withdraw
+        """
+        self.context.current.select_withdraw()
+
     def put_cash(self, amount):
         """put amount into selected account
 
@@ -58,6 +63,22 @@ class Atm:
             amount:
         """
         self.context.current.put_cash(amount)
+
+    def enter_withdrawal_amount(self, amount):
+        """enter the amount to withdraw from the selected account
+
+        Args:
+            amount (int): amount of money to withdraw
+        """
+        self.context.current.enter_withdrawal_amount(amount)
+
+    def take_cash(self, amount):
+        """withdraw the amount from selected account after vault is opened
+
+        Args:
+            amount (int): amount of money to withdraw
+        """
+        self.context.current.take_cash(amount)
 
 class AtmContext:
     def __init__(self):
@@ -67,6 +88,7 @@ class AtmContext:
             AtmAuthorized.get_name(): AtmAuthorized(self),
             AtmAccountSelected.get_name(): AtmAccountSelected(self),
             AtmProcessingDeposit.get_name(): AtmProcessingDeposit(self),
+            AtmPreProcessingWithdrawal.get_name(): AtmPreProcessingWithdrawal(self),
             AtmProcessingWithdrawal.get_name(): AtmProcessingWithdrawal(self),
             AtmDisplayingBalance.get_name(): AtmDisplayingBalance(self),
             AtmExit.get_name(): AtmExit(self),
@@ -76,7 +98,8 @@ class AtmContext:
         self.accounts = []
         self.selected_account = None  # type: Account
         self.bank_system = None  # type: IBankSystem
-        self.selected_account_tmp = None  # type: Account
+        self.amount_to_withdraw = 0  # type: int
+
 
     def set_state(self, state_name):
         """set current state by state name
@@ -84,6 +107,7 @@ class AtmContext:
         Args:
             state_name (str): name of next state
         """
+        print('next state is', state_name)
         self.current = self.states[state_name]
         self.current.on_load()
 
@@ -159,6 +183,13 @@ class AtmState:
         """
         raise RuntimeError('restricted behavior')
 
+    def select_withdraw(self):
+        """select withdraw menu
+
+        * it's changed to `AtmProcessingWithdraw`
+        """
+        raise RuntimeError('restricted behavior')
+
     def put_cash(self, amount):
         """deposit the amount into selected account in `AtmAccountSelected`
 
@@ -167,6 +198,21 @@ class AtmState:
         """
         raise RuntimeError('restricted behavior')
 
+    def enter_withdrawal_amount(self, amount):
+        """enter the amount to withdraw from the selected account
+
+        Args:
+            amount (int): amount of money to withdraw
+        """
+        raise RuntimeError('restricted behavior')
+
+    def take_cash(self, amount):
+        """withdraw the amount from selected account after vault is opened
+
+        Args:
+            amount (int): amount of money to withdraw
+        """
+        raise RuntimeError('restricted behavior')
 
 class AtmWait(AtmState):
     """The state waiting for a card (waiting for customers)
@@ -299,6 +345,13 @@ class AtmAccountSelected(AtmState):
         """
         self.shared_context.set_state(AtmProcessingDeposit.get_name())
 
+    def select_withdraw(self):
+        """select withdraw menu
+
+        * it's changed to `AtmProcessingWithdraw`
+        """
+        self.shared_context.set_state(AtmPreProcessingWithdrawal.get_name())
+
 
 class AtmProcessingDeposit(AtmState):
     """The state processing deposit transaction
@@ -328,6 +381,33 @@ class AtmProcessingDeposit(AtmState):
             self.shared_context.set_state(AtmExit.get_name())
 
 
+class AtmPreProcessingWithdrawal(AtmState):
+    """The state processing withdrawal transaction
+
+    - having card, pin, and selected account
+
+    - when customer enter amount to withdraw, then it check the balance
+
+    - if account have enough balance, then it's changed to `AtmProcessingWithdrawal`
+    """
+    def enter_withdrawal_amount(self, amount):
+        """enter amount customer want to withdraw
+
+        - check current machine's checkbox
+
+        - check customer's account balance
+        """
+        print('enter withdrawal amount', amount)
+        try:
+            if amount < 0:
+                raise ValueError('the amount must be positive')
+            self.shared_context.amount_to_withdraw = amount
+            self.shared_context.set_state(AtmProcessingWithdrawal.get_name())
+        except ValueError as e:
+            print(e)
+            self.shared_context.set_state(AtmExit.get_name())
+
+
 class AtmProcessingWithdrawal(AtmState):
     """The state processing withdrawal transaction
 
@@ -338,7 +418,23 @@ class AtmProcessingWithdrawal(AtmState):
     - when customer try to take more money than s/he got, then it's changed to
       `AtmExit` while throwing error
     """
-    pass
+
+    def take_cash(self, amount):
+        """withdraw the amount from selected account after vault is opened
+
+        Args:
+            amount (int): amount of money to withdraw
+        """
+        print('take cash', amount)
+        try:
+            if amount < 0:
+                raise ValueError('the amount must be positive')
+            if amount < self.shared_context.amount_to_withdraw:
+                self.shared_context.selected_account.balance += (self.shared_context.amount_to_withdraw - amount)
+            self.shared_context.set_state(AtmDisplayingBalance.get_name())
+        except ValueError as e:
+            print(e)
+            self.shared_context.set_state(AtmExit.get_name())
 
 
 class AtmDisplayingBalance(AtmState):
