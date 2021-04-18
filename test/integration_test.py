@@ -135,7 +135,7 @@ class IntegrationTest(TestCase):
         IntegrationTest.atm.select_account(0)
 
         # when
-        IntegrationTest.atm.display_balance()
+        IntegrationTest.atm.select_balance()
 
         # then
         self.assertEqual(
