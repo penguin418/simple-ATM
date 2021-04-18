@@ -1,7 +1,8 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from atm import Atm, AtmReady, AtmExit, AtmProcessingWithdrawal, AtmProcessingDeposit, AtmAccountSelected, AtmAuthorized
+from atm import Atm, AtmReady, AtmExit, AtmProcessingWithdrawal, AtmProcessingDeposit, AtmAccountSelected, \
+    AtmAuthorized, AtmDisplayingBalance, AtmPreProcessingWithdrawal
 
 
 class IntegrationTest(TestCase):
@@ -56,9 +57,9 @@ class IntegrationTest(TestCase):
             IntegrationTest.atm.context.current.get_name()
         )
 
-    def test4_deposit_into_selected_account(self):
+    def test4_1_select_deposit(self):
         # when
-        IntegrationTest.atm.deposit(100)
+        IntegrationTest.atm.select_deposit()
 
         # then
         self.assertEqual(
@@ -66,9 +67,42 @@ class IntegrationTest(TestCase):
             IntegrationTest.atm.context.current.get_name()
         )
 
-    def test5_withdraw_from_selected_account(self):
+    def test4_2_deposit_into_selected_account(self):
         # when
-        IntegrationTest.atm.withdraw(50)
+        IntegrationTest.atm.put_cash(100)
+
+        # then
+        self.assertEqual(
+            AtmDisplayingBalance.get_name(),
+            IntegrationTest.atm.context.current.get_name()
+        )
+
+    def test4_3_go_back_to_atm_account_selected(self):
+        # when
+        IntegrationTest.atm.back_to_accounts()
+
+        # then
+        self.assertEqual(
+            AtmAuthorized.get_name(),
+            IntegrationTest.atm.context.current.get_name()
+        )
+
+    def test5_0_select_withdraw(self):
+        # first, move to atm selected state
+        IntegrationTest.atm.select_account(0)
+
+        # when
+        IntegrationTest.atm.select_withdraw()
+
+        # then
+        self.assertEqual(
+            AtmPreProcessingWithdrawal.get_name(),
+            IntegrationTest.atm.context.current.get_name()
+        )
+
+    def test5_1_enter_withdraw_ammount(self):
+        # when
+        IntegrationTest.atm.enter_withdrawal_amount(50)
 
         # then
         self.assertEqual(
@@ -76,13 +110,36 @@ class IntegrationTest(TestCase):
             IntegrationTest.atm.context.current.get_name()
         )
 
+    def test5_2_withdraw_from_selected_account(self):
+        # when
+        IntegrationTest.atm.take_cash(50)
+
+        # then
+        self.assertEqual(
+            AtmDisplayingBalance.get_name(),
+            IntegrationTest.atm.context.current.get_name()
+        )
+
+    def test5_3_go_back_to_atm_account_selected(self):
+        # when
+        IntegrationTest.atm.back_to_accounts()
+
+        # then
+        self.assertEqual(
+            AtmAuthorized.get_name(),
+            IntegrationTest.atm.context.current.get_name()
+        )
+
     def test6_display_balance_from_selected_account(self):
+        # first, move to atm selected state
+        IntegrationTest.atm.select_account(0)
+
         # when
         IntegrationTest.atm.display_balance()
 
         # then
         self.assertEqual(
-            AtmReady.get_name(),
+            AtmDisplayingBalance.get_name(),
             IntegrationTest.atm.context.current.get_name()
         )
 
