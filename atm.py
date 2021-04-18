@@ -35,6 +35,9 @@ class Atm:
         """retrieve accounts connected to card"""
         self.context.current.get_accounts()
 
+    def back_to_accounts(self):
+        self.context.current.back_to_accounts()
+
     def select_account(self, idx):
         """select account
 
@@ -43,6 +46,18 @@ class Atm:
         """
         self.context.current.select_account(idx)
 
+    def select_deposit(self):
+        """select deposit
+        """
+        self.context.current.select_deposit()
+
+    def put_cash(self, amount):
+        """put amount into selected account
+
+        Args:
+            amount:
+        """
+        self.context.current.put_cash(amount)
 
 class AtmContext:
     def __init__(self):
@@ -61,6 +76,7 @@ class AtmContext:
         self.accounts = []
         self.selected_account = None  # type: Account
         self.bank_system = None  # type: IBankSystem
+        self.selected_account_tmp = None  # type: Account
 
     def set_state(self, state_name):
         """set current state by state name
@@ -111,12 +127,15 @@ class AtmState:
             pin (str): personal identification number
 
         Raises:
-            ValueError: incorrect pin is entered - when it raised,
-              then it does not be changed to `AtmExit`
+            ValueError: incorrect pin is entered - when it raised, then it does
+                not be changed to `AtmExit`
         """
         raise RuntimeError('restricted behavior')
 
     def get_accounts(self):
+        raise RuntimeError('restricted behavior')
+
+    def back_to_accounts(self):
         raise RuntimeError('restricted behavior')
 
     def select_account(self, idx):
@@ -126,8 +145,25 @@ class AtmState:
 
         Args:
             idx (int): index of accounts in shared_context, start with 0
+
         Raises:
-            IndexError: idx is not in range of account list - when it's raised, then it's changed to `AtmExit`
+            IndexError: idx is not in range of account list - when it's raised,
+                then it's changed to `AtmExit`
+        """
+        raise RuntimeError('restricted behavior')
+
+    def select_deposit(self):
+        """select deposit menu
+
+        * it's changed to `AtmProcessingDeposit`
+        """
+        raise RuntimeError('restricted behavior')
+
+    def put_cash(self, amount):
+        """deposit the amount into selected account in `AtmAccountSelected`
+
+        Args:
+            amount (int): amount of money to deposit
         """
         raise RuntimeError('restricted behavior')
 
@@ -144,6 +180,7 @@ class AtmWait(AtmState):
         """insert card in `AtmWait`
 
         - when success, then it's changed to `AtmReady`
+
         Args:
             card (Card): current card
         """
@@ -169,8 +206,8 @@ class AtmReady(AtmState):
             pin (str): personal identification number
 
         Raises:
-            ValueError: incorrect pin is entered - when it raised,
-              then it does not be changed to `AtmExit`
+            ValueError: incorrect pin is entered - when it raised, then it does
+                not be changed to `AtmExit`
         """
         print('enter pin', pin)
         # TODO: verify number from server
@@ -204,11 +241,12 @@ class AtmAuthorized(AtmState):
     def get_accounts(self):
         """get account list which is connected to card in `AtmAuthorized`
 
-        Raises:
-            ReferenceError: cannot find accounts - when it's raised, then it's changed to `AtmExit`
-
         Returns:
             list[Account]: list of account
+
+        Raises:
+            ReferenceError: cannot find accounts - when it's raised, then it's
+                changed to `AtmExit`
         """
         try:
             self.shared_context.accounts \
@@ -228,8 +266,10 @@ class AtmAuthorized(AtmState):
 
         Args:
             idx (int): index of accounts in shared_context, start with 0
+
         Raises:
-            IndexError: idx is not in range of account list - when it's raised, then it's changed to `AtmExit`
+            IndexError: idx is not in range of account list - when it's raised,
+                then it's changed to `AtmExit`
         """
         try:
             self.shared_context.selected_account \
@@ -252,7 +292,12 @@ class AtmAccountSelected(AtmState):
     - when a get-balance is selected, then it gives balance of selected account
     """
 
-    pass
+    def select_deposit(self):
+        """select deposit menu
+
+        * it's changed to `AtmProcessingDeposit`
+        """
+        self.shared_context.set_state(AtmProcessingDeposit.get_name())
 
 
 class AtmProcessingDeposit(AtmState):
@@ -265,7 +310,22 @@ class AtmProcessingDeposit(AtmState):
     - when customer put less/more money, then it spit out and is changed to
       `AtmExit` while throwing error
     """
-    pass
+
+    def put_cash(self, amount):
+        """put amount into selected account in `AtmProcessingDeposit`
+
+        Args:
+            amount: the amount the customer wants to deposit
+        """
+        print('put cash', amount)
+        try:
+            if amount < 0:
+                raise ValueError('the amount must be positive')
+            self.shared_context.selected_account.balance += amount
+            self.shared_context.set_state(AtmDisplayingBalance.get_name())
+        except ValueError as e:
+            print(e)
+            self.shared_context.set_state(AtmExit.get_name())
 
 
 class AtmProcessingWithdrawal(AtmState):
@@ -290,7 +350,9 @@ class AtmDisplayingBalance(AtmState):
 
     - cannot go back to former state
     """
-    pass
+
+    def back_to_accounts(self):
+        self.shared_context.set_state(AtmAuthorized.get_name())
 
 
 class AtmExit(AtmState):
