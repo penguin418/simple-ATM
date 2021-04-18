@@ -53,6 +53,7 @@ class AtmContext:
             AtmAccountSelected.get_name(): AtmAccountSelected(self),
             AtmProcessingDeposit.get_name(): AtmProcessingDeposit(self),
             AtmProcessingWithdrawal.get_name(): AtmProcessingWithdrawal(self),
+            AtmDisplayingBalance.get_name(): AtmDisplayingBalance(self),
             AtmExit.get_name(): AtmExit(self),
         }
         self.current = self.states[AtmWait.get_name()]  # type: AtmState
@@ -276,6 +277,18 @@ class AtmProcessingWithdrawal(AtmState):
 
     - when customer try to take more money than s/he got, then it's changed to
       `AtmExit` while throwing error
+    """
+    pass
+
+
+class AtmDisplayingBalance(AtmState):
+    """The state displaying balance
+
+    - having card, pin, and selected account
+
+    - when each transaction finished, then those states are changed to this state
+
+    - cannot go back to former state
     """
     pass
 
