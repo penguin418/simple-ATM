@@ -84,6 +84,14 @@ class Atm:
         """select balance"""
         self.context.current.select_balance()
 
+    def exit(self):
+        """exit system"""
+        self.context.current.exit()
+
+    def take_card(self):
+        """take card in exit state"""
+        self.context.current.remove_card()
+
 class AtmContext:
     def __init__(self):
         self.states = {
@@ -104,6 +112,13 @@ class AtmContext:
         self.bank_system = None  # type: IBankSystem
         self.amount_to_withdraw = 0  # type: int
 
+    def clean_context(self):
+        self.current = self.states[AtmWait.get_name()]  # type: AtmState
+        self.card = None  # type: Card
+        self.accounts = []
+        self.selected_account = None  # type: Account
+        self.bank_system = None  # type: IBankSystem
+        self.amount_to_withdraw = 0  # type: int
 
     def set_state(self, state_name):
         """set current state by state name
@@ -225,6 +240,20 @@ class AtmState:
         """
         raise RuntimeError('restricted behavior')
 
+    def exit(self):
+        """select display balance menu in multiple state
+
+        * it's changed to `AtmExit`
+        """
+        raise RuntimeError('restricted behavior')
+
+    def remove_card(self):
+        """remove card and remove all context variables
+
+        * it's changed to `AtmWait'
+        """
+        raise RuntimeError('restricted behavior')
+
 class AtmWait(AtmState):
     """The state waiting for a card (waiting for customers)
 
@@ -281,6 +310,8 @@ class AtmReady(AtmState):
             self.shared_context.set_state(AtmExit.get_name())
             print(e)
 
+    def exit(self):
+        self.shared_context.set_state(AtmExit.get_name())
 
 class AtmAuthorized(AtmState):
     """The state waiting for selecting account
@@ -336,6 +367,8 @@ class AtmAuthorized(AtmState):
             print(e)
             print('please choose again, index starts from 0, candidates=', self.shared_context.accounts)
 
+    def exit(self):
+        self.shared_context.set_state(AtmExit.get_name())
 
 class AtmAccountSelected(AtmState):
     """The state waiting for selecting transaction
@@ -362,6 +395,9 @@ class AtmAccountSelected(AtmState):
         * it's changed to `AtmProcessingWithdraw`
         """
         self.shared_context.set_state(AtmPreProcessingWithdrawal.get_name())
+
+    def exit(self):
+        self.shared_context.set_state(AtmExit.get_name())
 
     def select_balance(self):
         """select display balance menu in `AtmAccountSelected`
@@ -397,6 +433,8 @@ class AtmProcessingDeposit(AtmState):
             print(e)
             self.shared_context.set_state(AtmExit.get_name())
 
+    def exit(self):
+        self.shared_context.set_state(AtmExit.get_name())
 
 class AtmPreProcessingWithdrawal(AtmState):
     """The state processing withdrawal transaction
@@ -424,6 +462,8 @@ class AtmPreProcessingWithdrawal(AtmState):
             print(e)
             self.shared_context.set_state(AtmExit.get_name())
 
+    def exit(self):
+        self.shared_context.set_state(AtmExit.get_name())
 
 class AtmProcessingWithdrawal(AtmState):
     """The state processing withdrawal transaction
@@ -453,6 +493,9 @@ class AtmProcessingWithdrawal(AtmState):
             print(e)
             self.shared_context.set_state(AtmExit.get_name())
 
+    def exit(self):
+        self.shared_context.selected_account.balance += self.shared_context.amount_to_withdraw
+        self.shared_context.set_state(AtmExit.get_name())
 
 class AtmDisplayingBalance(AtmState):
     """The state displaying balance
@@ -470,6 +513,8 @@ class AtmDisplayingBalance(AtmState):
     def back_to_accounts(self):
         self.shared_context.set_state(AtmAuthorized.get_name())
 
+    def exit(self):
+        self.shared_context.set_state(AtmExit.get_name())
 
 class AtmExit(AtmState):
     """The state pull out card
@@ -478,3 +523,5 @@ class AtmExit(AtmState):
 
     - when customer take card, then it's changed to `AtmWait`
     """
+    def remove_card(self):
+        self.shared_context.clean_context()

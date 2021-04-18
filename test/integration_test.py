@@ -2,7 +2,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock
 
 from atm import Atm, AtmReady, AtmExit, AtmProcessingWithdrawal, AtmProcessingDeposit, AtmAccountSelected, \
-    AtmAuthorized, AtmDisplayingBalance, AtmPreProcessingWithdrawal
+    AtmAuthorized, AtmDisplayingBalance, AtmPreProcessingWithdrawal, AtmWait
 
 
 class IntegrationTest(TestCase):
@@ -143,12 +143,22 @@ class IntegrationTest(TestCase):
             IntegrationTest.atm.context.current.get_name()
         )
 
-    def test7_leave_system_for_next_person(self):
+    def test7_leave_system(self):
         # when
         IntegrationTest.atm.exit()
 
         # then
         self.assertEqual(
             AtmExit.get_name(),
+            IntegrationTest.atm.context.current.get_name()
+        )
+
+    def test8_remove_card(self):
+        # when
+        IntegrationTest.atm.take_card()
+
+        # then
+        self.assertEqual(
+            AtmWait.get_name(),
             IntegrationTest.atm.context.current.get_name()
         )
