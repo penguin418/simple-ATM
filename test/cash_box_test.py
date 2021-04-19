@@ -8,26 +8,35 @@ from model.domain import CashBox
 class Unittest(TestCase):
     def setUp(self):
         # given
-        self.atm = Atm(CashBox(cash=1000, limit=5000))
+        self.atm = Atm(CashBox(cash=1000, limit=2000))
         card = MagicMock()
         card.card_holder = MagicMock()
-        card.card_holder.accounts = [MagicMock()]
-        card.card_holder.accounts[0].balance = 2000
-        self.atm.insert_card(card)
 
-    def test_enter_valid_pin(self):
-        # when
+        account = MagicMock()
+        account.balance = 100
+        card.card_holder.accounts = [account]
+        card.card_holder.accounts[0].balance = 3000
+
+        self.atm.insert_card(card)
         self.atm.enter_pin('1')
+        self.atm.select_account(0)
+
+    def test_cash_box_overflow(self):
+        # when
+        self.atm.select_deposit()
+        self.atm.put_in_cash(1500)
 
         # then
         self.assertEqual(
-            AtmAuthorized.get_name(),
+            AtmExit.get_name(),
             self.atm.get_current_state_name()
         )
 
-    def test_enter_invalid_pin(self):
+    def test_enter_overflow2(self):
         # when
-        self.atm.enter_pin('2')
+        self.atm.select_withdraw()
+        self.atm.enter_withdrawal_amount(1500)
+        self.atm.take_out_cash(1500)
 
         # then
         self.assertEqual(
