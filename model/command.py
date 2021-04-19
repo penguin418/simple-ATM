@@ -1,4 +1,5 @@
 import copy
+from abc import abstractmethod
 from typing import TYPE_CHECKING
 
 from model.base import SingletonMeta
@@ -9,7 +10,7 @@ if TYPE_CHECKING:
 
 
 class IUpdateTransactionCommand(metaclass=SingletonMeta):
-    # @abstractmethod
+    @abstractmethod
     def execute(self, bank_system, cash_box, account, offset):
         return True
 
