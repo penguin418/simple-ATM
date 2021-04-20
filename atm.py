@@ -2,6 +2,7 @@ import copy
 import logging
 from typing import TYPE_CHECKING
 
+from errors import ErrorCode
 from infra.bank_api import MockBankSystem1
 from model.command import MockUpdateTransactionCommand
 
@@ -146,6 +147,17 @@ class Atm:
         """
         self.__context.register_on_load(on_load_func)
 
+    def register_on_error(self, on_error_func):
+        """Register on error function to be called after error
+
+        * The method design to support UI
+
+        Args:
+            on_error_func (function): Function to be called after changing state
+                `on_error_func` should have one parameter (e.g. Callable[[Exception], NoReturn]) to get an error message
+                return type does not matter
+        """
+        self.__context.register_on_error(on_error_func)
 
 class AtmContext:
     def __init__(self):
@@ -165,14 +177,14 @@ class AtmContext:
         self.bank_system = None  # type: IBankSystem
         self.update_transaction_command = None # type: IUpdateTransactionCommand
         self.on_load_func = None # type: Callable[..., NoReturn]
+        self.on_error_func = None # type: Callable[[Exception], NoReturn]
 
         # Temporal variables which can be reset on user's leave
         self.current = self.states[AtmWait.get_name()]  # type: AtmState
         self.card = None  # type: Card
         self.accounts = []
         self.selected_account = None  # type: Account
-        self.amount_to_withdrawn = 0  # type: int
-
+        self.amount_to_be_withdrawn = 0  # type: int
     def clean_context(self):
         """Clean context
 
@@ -182,7 +194,7 @@ class AtmContext:
         self.card = None  # type: Card
         self.accounts = []
         self.selected_account = None  # type: Account
-        self.amount_to_withdrawn = 0  # type: int
+        self.amount_to_be_withdrawn = 0  # type: int
 
 
     def set_state(self, state_name):
@@ -208,6 +220,18 @@ class AtmContext:
         """
         self.on_load_func = on_load_func
 
+    def register_on_error(self, on_error_func):
+        """Register on error function to be called after error
+
+        * The method design to support UI
+
+        Args:
+            on_error_func (function): Function to be called after changing state
+                `on_error_func` should have one parameter (e.g. Callable[[Exception], NoReturn]) to get an error
+                return type does not matter
+        """
+        self.on_error_func = on_error_func
+
 class AtmState:
     """The default state
 
@@ -228,6 +252,15 @@ class AtmState:
         - Class state_name is used for picking next state in `AtmContext`
         """
         return cls.__name__
+
+    def on_error(self, e):
+        """call on_errr_func in context
+
+        Args:
+            e (str): error message
+        """
+        if self.shared_context.on_error_func:
+            self.shared_context.on_error_func(e)
 
     def on_load(self):
         pass
@@ -388,8 +421,9 @@ class AtmReady(AtmState):
                 self.shared_context.set_state(AtmAuthorized.get_name())
                 return True
             else:
-                raise ValueError('pin is not matched')
+                raise ValueError(ErrorCode.PIN_IS_NOT_MATCHED)
         except ValueError as e:
+            self.on_error(e)
             self.shared_context.set_state(AtmExit.get_name())
             logging.getLogger().warning(e)
 
@@ -423,10 +457,11 @@ class AtmAuthorized(AtmState):
             self.shared_context.accounts \
                 = self.shared_context.bank_system.get_accounts(self.shared_context.card)
             if len(self.shared_context.accounts) < 1:
-                raise RuntimeError('cannot find accounts')
+                raise RuntimeError(ErrorCode.CANNOT_FIND_ACCOUNT)
             print('get accounts result=%s' % self.shared_context.accounts)
         except RuntimeError as e:
             print(e)
+            self.on_error(e)
             self.shared_context.set_state(AtmExit.get_name())
         return copy.deepcopy(self.shared_context.accounts)
 
@@ -447,6 +482,7 @@ class AtmAuthorized(AtmState):
             self.shared_context.set_state(AtmAccountSelected.get_name())
         except IndexError as e:
             print(e)
+            self.on_error(e)
             print('index starts from 0, candidates=%s' % self.shared_context.accounts)
 
     def exit(self):
@@ -516,7 +552,7 @@ class AtmProcessingDeposit(AtmState):
         print('put cash %s' % amount)
         try:
             if amount < 0:
-                raise ValueError('the amount must be positive')
+                raise ValueError(ErrorCode.AMOUNT_MUST_BE_POSITIVE)
             # transaction
             self.shared_context.update_transaction_command.execute(
                 self.shared_context.bank_system,
@@ -527,7 +563,8 @@ class AtmProcessingDeposit(AtmState):
             self.shared_context.set_state(AtmDisplayingBalance.get_name())
         except ValueError as e:
             print(e)
-            # assume customer withdraw the money in the vault
+            self.on_error(e)
+            # in this case, assume customer withdraw the left money in the vault
             self.shared_context.set_state(AtmExit.get_name())
 
     def exit(self):
@@ -564,15 +601,16 @@ class AtmPreProcessingWithdrawal(AtmState):
         print('enter withdrawal amount %s' % amount)
         try:
             if amount < 0:
-                raise ValueError('the amount must be positive')
+                raise ValueError(ErrorCode.AMOUNT_MUST_BE_POSITIVE)
             if self.shared_context.cash_box.cash < amount:
-                raise ValueError('atm does not have enough cash')
+                raise ValueError(ErrorCode.CASH_BOX_DOES_NOT_HAVE_ENOUGH_CASH)
             if self.shared_context.selected_account.balance < amount:
-                raise ValueError('account does not have enough cash')
-            self.shared_context.amount_to_withdrawn = amount
+                raise ValueError(ErrorCode.ACCOUNT_DOES_NOT_HAVE_ENOUGH_CASH)
+            self.shared_context.amount_to_be_withdrawn = amount
             self.shared_context.set_state(AtmProcessingWithdrawal.get_name())
         except ValueError as e:
             print(str(e))
+            self.on_error(e)
             self.shared_context.set_state(AtmExit.get_name())
 
     def exit(self):
@@ -588,7 +626,7 @@ class AtmPreProcessingWithdrawal(AtmState):
 class AtmProcessingWithdrawal(AtmState):
     """The state processing withdrawal transaction
 
-    - Have card, selected account and amount_to_withdrawn
+    - Have card, selected account and amount_to_be_withdrawn
 
     - When customer take money, then it changes to `AtmAccountSelected`
 
@@ -606,9 +644,9 @@ class AtmProcessingWithdrawal(AtmState):
         print('[take cash %s]' % amount)
         try:
             if amount < 0:
-                raise RuntimeError('the amount must be positive')
-            if amount > self.shared_context.amount_to_withdrawn:
-                raise RuntimeError('the amount must be lower than amount_to_withdrawn')
+                raise RuntimeError(ErrorCode.AMOUNT_MUST_BE_POSITIVE)
+            if amount > self.shared_context.amount_to_be_withdrawn:
+                raise RuntimeError(ErrorCode.AMOUNT_MUST_BE_LOWER_THAN_AMOUNT_TO_BE_WITHDRAWN)
             # transaction
             self.shared_context.update_transaction_command.execute(
                 self.shared_context.bank_system,
@@ -619,10 +657,11 @@ class AtmProcessingWithdrawal(AtmState):
             self.shared_context.set_state(AtmDisplayingBalance.get_name())
         except ValueError as e:
             print(e)
+            self.on_error(e)
             self.shared_context.set_state(AtmDisplayingBalance.get_name())
 
     def exit(self):
-        self.shared_context.selected_account.balance += self.shared_context.amount_to_withdrawn
+        self.shared_context.selected_account.balance += self.shared_context.amount_to_be_withdrawn
         self.shared_context.set_state(AtmExit.get_name())
 
     def back(self):
@@ -630,7 +669,7 @@ class AtmProcessingWithdrawal(AtmState):
 
         * May be Customer wants to change amount to withdrawn
         """
-        self.shared_context.amount_to_withdrawn = 0
+        self.shared_context.amount_to_be_withdrawn = 0
         self.shared_context.set_state(AtmPreProcessingWithdrawal.get_name())
 
 class AtmDisplayingBalance(AtmState):

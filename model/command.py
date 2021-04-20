@@ -2,6 +2,7 @@ import copy
 from abc import abstractmethod
 from typing import TYPE_CHECKING
 
+from errors import ErrorCode
 from model.base import SingletonMeta
 
 if TYPE_CHECKING:
@@ -37,14 +38,14 @@ class MockUpdateTransactionCommand(IUpdateTransactionCommand):
             account.balance += offset
             if offset > 0:  # Deposit
                 if cash_box.limit < cash_box.cash + offset:
-                    raise ValueError('cannot deposit any more, bin is almost full')
+                    raise ValueError(ErrorCode.CASH_BOX_DOES_NOT_HAVE_ENOUGH_SPACE)
                 # Sync with bank system
                 # If error occur, raise
             else:  # Withdrawal, offset has negative value
                 if account.balance + offset < 0:
-                    raise ValueError('atm does not have enough cash')
+                    raise ValueError(ErrorCode.ACCOUNT_DOES_NOT_HAVE_ENOUGH_CASH)
                 if cash_box.cash + offset < 0:
-                    raise ValueError('cash box does not have enough cash')
+                    raise ValueError(ErrorCode.CASH_BOX_DOES_NOT_HAVE_ENOUGH_CASH)
                 # Sync with bank system
                 # Same as above
         except ValueError as e:
